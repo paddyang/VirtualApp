@@ -264,7 +264,8 @@ public final class VClient extends IVClient.Stub {
     }
     public void initProcess(ClientConfig clientConfig) {
         if (this.clientConfig != null) {
-            throw new RuntimeException("reject init process: " + clientConfig.processName + ", this process is : " + this.clientConfig.processName);
+            //if prcesss have init kill all app rather than throw exception
+            VActivityManager.get().killAllApps();
         }
         this.clientConfig = clientConfig;
     }
@@ -449,17 +450,18 @@ public final class VClient extends IVClient.Stub {
 
         fixForEmui10();
 
+        Object mainThread = VirtualCore.mainThread();
+		
         if (getConfig().isEnableIORedirect()) {
             if (VirtualCore.get().isIORelocateWork()) {
                 startIORelocater(info, isSubRemote);
+                NativeEngine.launchEngine();
+                NativeEngine.startDexOverride();
             } else {
                 VLog.w(TAG, "IO Relocate verify fail.");
             }
         }
-        NativeEngine.launchEngine();
         mEnvironmentPrepared = true;
-        Object mainThread = VirtualCore.mainThread();
-        NativeEngine.startDexOverride();
         initDataStorage(isSubRemote, userId, packageName);
         Context context = createPackageContext(data.appInfo);
         File codeCacheDir;
@@ -564,7 +566,10 @@ public final class VClient extends IVClient.Stub {
 //            }
             mInitialApplication = LoadedApk.makeApplication.call(data.info, false, null);
         } catch (Throwable e) {
-            throw new RuntimeException("Unable to makeApplication", e);
+			if(Build.VERSION.SDK_INT >= 31)
+			{
+				// ignored
+			}
         }
         Log.e("kk", data.info+" mInitialApplication set  " + LoadedApk.mApplication.get(data.info));
         mirror.android.app.ActivityThread.mInitialApplication.set(mainThread, mInitialApplication);
